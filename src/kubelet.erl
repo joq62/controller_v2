@@ -1,17 +1,13 @@
 %%% -------------------------------------------------------------------
 %%% @author  : Joq Erlang
 %%% @doc: : 
-%%% Manage Computers
-%%% Install Cluster
-%%% Install cluster
-%%% Data-{HostId,Ip,SshPort,Uid,Pwd}
-%%% available_hosts()-> [{HostId,Ip,SshPort,Uid,Pwd},..]
-%%% install_leader_host({HostId,Ip,SshPort,Uid,Pwd})->ok|{error,Err}
-%%% cluster_status()->[{running,WorkingNodes},{not_running,NotRunningNodes}]
-
-%%% Created : 
+%%% Created :
+%%% Node end point 
+%%% Creates and deletes Pods
+%%% 
+%%% API-kube: Interface 
 %%% -------------------------------------------------------------------
--module(controller).  
+-module(kubelet).  
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -26,7 +22,7 @@
 %% Key Data structures
 %% 
 %% --------------------------------------------------------------------
--record(state, {cookie,cluster_name}).
+-record(state, {pods}).
 
 
 
@@ -46,6 +42,13 @@
 
 % OaM related
 -export([
+	 add_pod_spec/2,
+	 delete_pod_spec/1,
+	 create_pod/2,
+	 create_pod/5,
+	 delete_pod/1,
+	 get_pods/0,
+
 	 load_config/0,
 	 read_config/0,
 	 status_hosts/0,
@@ -60,7 +63,7 @@
 	]).
 
 -export([
-	 create/4,
+
 	 install/0,
 	 available_hosts/0
 
@@ -98,8 +101,21 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 
 %%---------------------------------------------------------------
-create(NumMasters,Hosts,Name,Cookie)->
-    gen_server:call(?MODULE, {create,NumMasters,Hosts,Name,Cookie},infinity).
+get_pods()->
+    gen_server:call(?MODULE, {get_pods},infinity).
+
+add_pod_spec(PodName,Spec)->
+    gen_server:call(?MODULE, {add_pod_spec,PodName,Spec},infinity).
+delete_pod_spec(PodName)->
+    gen_server:call(?MODULE, {delete_pod_spec,PodName},infinity).
+create_pod(Id,Vsn,Apps,Env,Hosts)->
+    gen_server:call(?MODULE, {create_pod,Id,Vsn,Apps,Env,Hosts},infinity).
+
+create_pod(PodName,Spec)->
+    gen_server:call(?MODULE, {create_pod,PodName,Spec},infinity).
+delete_pod(PodId)->
+    gen_server:call(?MODULE, {delete_pod,PodId},infinity).
+    
 delete(Name)->
     gen_server:call(?MODULE, {delete,Name},infinity).    
 
@@ -166,29 +182,7 @@ ping()->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-    io:format("all env ~p~n",[application:get_all_env()]),
-    {ok,Cookie}=application:get_env(cookie),
-    true=is_list(Cookie),
-    {ok,ClusterName}=application:get_env(cluster_name),
-    true=is_list(ClusterName),
-    {ok,NumControllers}=application:get_env(num_controllers),
-    true=is_integer(NumControllers),
-    {ok,Hosts}=application:get_env(hosts),
-    true=is_list(Hosts),
-    {ok,IsLeader}=application:get_env(is_leader),
-    true=is_boolean(IsLeader),
-    case IsLeader of
-	true->
-	    io:format("role = ~p~n",[leader]),
-	    ok=controller_leader:start_local_etcd(ClusterName,Cookie),
-	    {RunningHosts,MissingHosts}=controller_leader:start_host_controller(),
-	    
-	    io:format("RunningHosts = ~p~n",[RunningHosts]),
-	    io:format("MissingHosts = ~p~n",[MissingHosts]);
-	false->
-	    io:format("role = ~p~n",[not_leader])
-    end,
-    
+   
     {ok, #state{}}.
     
 %% --------------------------------------------------------------------
@@ -201,10 +195,38 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
+handle_call({get_pods},_From,State) ->
+    Reply=State#state.pods,
+    {reply, Reply, State};
 
+handle_call({create_pod,Id,Vsn,Apps,Env,Hosts},_From,State) ->
+    Reply=case rpc:call(node(),pod,create,[Id,Vsn,Apps,Env,Hosts]) of
+	      {ok,Node,Dir}->
+		  PodList=State#state.pods,
+		  NewPods=[{Id,Node,Dir,date(),time()}|PodList],
+		  NewState=State#state{pods=NewPods},
+		  {ok,Node};
+	      Error->
+		  NewState=State,
+		  {error,[Error,create_pod,Id,Vsn,Apps,Env,Hosts]}	  
+	  end,
+    {reply, Reply, NewState};
 
+handle_call({create_pod,PodName,Spec},_From,State) ->
+    PodId=rpc:call(node(),pod,create,[PodName,Spec]),
+    Reply=PodId,
+    {reply, Reply, State};
 
+handle_call({delete_pod,PodId},_From,State) ->
+    Reply=glurk,
+    {reply, Reply, State};
 
+handle_call({add_pod_spec,PodName,Spec},_From,State) ->
+    Reply=glurk,
+    {reply, Reply, State};
+handle_call({delete_pod_spec,PodName},_From,State) ->
+    Reply=glurk,
+    {reply, Reply, State};
 
 
 handle_call({start_slaves,HostId,SlaveNames,ErlCmd},_From,State) ->

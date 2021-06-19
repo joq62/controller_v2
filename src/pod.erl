@@ -4,20 +4,18 @@
 %%% 
 %%% Created : 10 dec 2012
 %%% -------------------------------------------------------------------
--module(controller_leader).  
+-module(pod).  
    
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
 
 %%---------------------------------------------------------------------
-%% Records & defintions
-%%---------------------------------------------------------------------
--define(ControllerLeaderTime,30).
+%% Records for test
+%%
 
 %% --------------------------------------------------------------------
--export([start_local_etcd/2,
-	 start_host_controller/0]).
+-compile(export_all).
 
 
 %% ====================================================================
@@ -29,25 +27,53 @@
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-start_local_etcd(ClusterName,Cookie)->
-    application:set_env([{etcd,[{is_leader,true}]}]),
-    ok=application:start(etcd),
-    timer:sleep(2000),
-    {atomic,ok}=etcd:cluster_info_create(ClusterName,Cookie),
-    ok.
+create(Id,_Vsn,AppInfo,EnvConfig,_Hosts) ->
+    % Unique PodId
+    Unique=integer_to_list(erlang:system_time(millisecond)),
+    NodeId=Unique++"_"++Id,
+    % Create unique dir
+    ok=file:make_dir(NodeId),
+    % clone application 
+    {AppId,_AppVsn,GitPath}=AppInfo,
+    PathApp=filename:join([NodeId,AppId]),
+    ok=file:make_dir(PathApp),
+    os:cmd("git clone "++GitPath++" "++PathApp),
+    %Start Slave
+    {ok,Host}=inet:gethostname(),
+    Cookie=atom_to_list(erlang:get_cookie()),
+    Ebin=filename:join([PathApp,"ebin"]),
+    SlaveArgs="-pa "++Ebin++" "++"-setcookie "++Cookie,
+    {ok,Node}=slave:start(Host,NodeId,SlaveArgs),
+    %Start application
+    App=list_to_atom(AppId),
+    case EnvConfig of
+	[]->
+	    ok;
+	EnvConfig ->
+	    rpc:call(Node,application,set_env,[EnvConfig])
+    end,
+    ok=rpc:call(Node,application,start,[App]),
+    % Check if started
+    AppsSlave=rpc:call(Node,application,which_applications,[]),
+    true=lists:keymember(App,1,AppsSlave),
+    {ok,Node,NodeId}.
+   
+
+
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-
-start_host_controller()->
-    host_controller:start(),
-    [{running,R},{missing,M}]=host_controller:status_hosts(),
-    {R,M}.
-
+node(Name)->
+    {ok,HostId}=net:gethostname(),
+    list_to_atom(Name++"@"++HostId).
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
+vmid_hostid(Node)->
+    NodeStr=atom_to_list(Node),
+    [VmId,HostId]=string:lexemes(NodeStr,"@"),
+    {VmId,HostId}.

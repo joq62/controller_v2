@@ -1,7 +1,7 @@
 %% Author: uabjle
 %% Created: 10 dec 2012
 %% Description: TODO: Add description to application_org
--module(controller_app).
+-module(kubelet_app).
 
 -behaviour(application).
 %% --------------------------------------------------------------------
@@ -44,7 +44,7 @@
 %%          {error, Reason}
 %% --------------------------------------------------------------------
 start(_Type, _StartArgs) ->
-    {ok,Pid}= controller_sup:start_link(),
+    {ok,Pid}= kubelet_sup:start_link(),
     {ok,Pid}.
    
 %% --------------------------------------------------------------------
