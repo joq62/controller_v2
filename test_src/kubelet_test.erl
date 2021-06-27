@@ -12,11 +12,6 @@
 %-include_lib("eunit/include/eunit.hrl").
 %% --------------------------------------------------------------------
 
--define(GitHostConfigCmd,"git clone https://github.com/joq62/host_config.git").
--define(HostFile,"host_config/hosts.config").
--define(HostConfigDir,"host_config").
-
-
 %% External exports
 -export([start/0]). 
 
@@ -78,17 +73,27 @@ start()->
 %% --------------------------------------------------------------------
 pass_0()->
     %Start one new pod orginal
+    []=kubelet:get_pods(),
     Id="orginal_pod",
     Vsn="1.0.0",
     AppInfo={"orginal","1.0.0","https://github.com/joq62/orginal.git"},
     Env=[],
     Host=[],
-    {ok,Pod1}=kubelet:create_pod(Id,Vsn,AppInfo,Env,Host),
+    {ok,Pod1}=kubelet:create_pod(Id,Vsn,AppInfo,Env),
+    [{"orginal_pod",
+      Node,
+      Dir,
+      _Date,
+      _Time}]=kubelet:get_pods(),
     pong=net_adm:ping(Pod1),
     {pong,_,support}=rpc:call(Pod1,support,ping,[]),
     AppsSlave=rpc:call(Pod1,application,which_applications,[]),
     true=lists:keymember(orginal,1,AppsSlave),
     
+    %% Delete
+    ok=kubelet:delete_pod(Id),
+    []=kubelet:get_pods(),
+    {badrpc,nodedown}=rpc:call(Pod1,support,ping,[]),
     ok.
 
 %% --------------------------------------------------------------------
@@ -97,7 +102,7 @@ pass_0()->
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_1()->
-   
+    
     ok.
 
 %% --------------------------------------------------------------------
@@ -105,7 +110,7 @@ pass_1()->
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-pass_5()->
+pass_2()->
 
     ok.
 
@@ -133,7 +138,7 @@ pass_4()->
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-pass_2()->
+pass_5()->
   
     
     ok.

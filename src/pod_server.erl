@@ -21,9 +21,7 @@
 %% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
--define(HostFile,"glurk").
--define(HostConfigDir,"g").
--define(GitHostConfigCmd,"g").
+
 %% --------------------------------------------------------------------
 %% Key Data structures
 %% 
@@ -48,32 +46,13 @@
 
 % OaM related
 -export([
-	 load_config/0,
-	 read_config/0,
-	 status_hosts/0,
-	 status_slaves/0,
-	 start_masters/1,
-	 start_slaves/3,
-	 start_slaves/1,
-	 running_hosts/0,
-	 running_slaves/0,
-	 missing_hosts/0,
-	 missing_slaves/0
+	 start_slaves/3
 	]).
 
 -export([
 	 create/2,
-	 create/5,
-	 install/0,
-	 available_hosts/0
-
-	]).
-
-
--export([boot/0,
-	 start_app/5,
-	 stop_app/4,
-	 app_status/2
+	 create/4,
+	 delete/2
 	]).
 
 -export([start/0,
@@ -91,9 +70,6 @@
 
 %% Asynchrounus Signals
 
-boot()->
-    application:start(?MODULE).
-
 %% Gen server functions
 
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -102,55 +78,19 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 %%---------------------------------------------------------------
 
-create(Id,Vsn,Apps,Env,Hosts)->
-    gen_server:call(?MODULE, {create,Id,Vsn,Apps,Env,Hosts},infinity).
+create(Id,Vsn,Apps,Env)->
+    gen_server:call(?MODULE, {create,Id,Vsn,Apps,Env},infinity).
 
 create(PodId,Spec)->
     gen_server:call(?MODULE, {create,PodId,Spec},infinity).
-delete(Name)->
-    gen_server:call(?MODULE, {delete,Name},infinity).    
+delete(Node,Dir)->
+    gen_server:call(?MODULE, {delete,Node,Dir},infinity).    
 
 %%---------------------------------------------------------------
-running_hosts()->
-       gen_server:call(?MODULE, {running_hosts},infinity).
-running_slaves()->
-       gen_server:call(?MODULE, {running_slaves},infinity).
-missing_hosts()->
-       gen_server:call(?MODULE, {missing_hosts},infinity).
-missing_slaves()->
-       gen_server:call(?MODULE, {missing_slaves},infinity).
-
-load_config()-> 
-    gen_server:call(?MODULE, {load_config},infinity).
-read_config()-> 
-    gen_server:call(?MODULE, {read_config},infinity).
-status_hosts()-> 
-    gen_server:call(?MODULE, {status_hosts},infinity).
-status_slaves()-> 
-    gen_server:call(?MODULE, {status_slaves},infinity).
-
-start_masters(HostIds)->
-    gen_server:call(?MODULE, {start_masters,HostIds},infinity).
-start_slaves(HostIds)->
-    gen_server:call(?MODULE, {start_slaves,HostIds},infinity).
 
 start_slaves(HostId,SlaveNames,ErlCmd)->
     gen_server:call(?MODULE, {start_slaves,HostId,SlaveNames,ErlCmd},infinity).
     
-%% old
-install()-> 
-    gen_server:call(?MODULE, {install},infinity).
-available_hosts()-> 
-    gen_server:call(?MODULE, {available_hosts},infinity).
-
-start_app(ApplicationStr,Application,CloneCmd,Dir,Vm)-> 
-    gen_server:call(?MODULE, {start_app,ApplicationStr,Application,CloneCmd,Dir,Vm},infinity).
-
-stop_app(ApplicationStr,Application,Dir,Vm)-> 
-    gen_server:call(?MODULE, {stop_app,ApplicationStr,Application,Dir,Vm},infinity).
-
-app_status(Vm,Application)-> 
-    gen_server:call(?MODULE, {app_status,Vm,Application},infinity).
 ping()-> 
     gen_server:call(?MODULE, {ping},infinity).
 
@@ -173,7 +113,7 @@ ping()->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-   
+  
     {ok, #state{}}.
     
 %% --------------------------------------------------------------------
@@ -187,15 +127,14 @@ init([]) ->
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
 
-handle_call({create,Id,Vsn,Apps,Env,Hosts},_From,State) ->
-    %[{App,GitPath}]
+handle_call({delete,Node,Dir},_From,State) ->
     
-    Unique=integer_to_list(erlang:system_time(millisecond)),
-    NodeId=Unique++"_"++Id,
-    {ok,Host}=inet:gethostname(),
-    {ok,Node}=slave:start(Host,NodeId),
+    Reply=rpc:call(node(),pod,delete,[Node,Dir]),
+    {reply, Reply, State};
+
+handle_call({create,PodId,Vsn,App,Env},_From,State) ->
     
-    Reply={ok,Node},
+    Reply=rpc:call(node(),pod,create,[PodId,Vsn,App,Env]),
     {reply, Reply, State};
 
 
@@ -208,31 +147,6 @@ handle_call({create,PodId,Spec},_From,State) ->
     Reply={ok,Node},
     {reply, Reply, State};
 
-
-handle_call({read_config},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,read_config,[?HostFile],5000),
-    {reply, Reply, State};
-
-handle_call({load_config},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,load_config,[?HostConfigDir,?HostFile,?GitHostConfigCmd],2*5000),
-   
-    {reply, Reply, State};
-
-
-handle_call({install},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,install,[],2*5000),
-    {reply, Reply, State};
-
-
-handle_call({start_app,ApplicationStr,Application,CloneCmd,Dir,Vm},_From,State) ->
-    Reply=cluster_lib:start_app(ApplicationStr,Application,CloneCmd,Dir,Vm),
-    {reply, Reply, State};
-handle_call({stop_app,ApplicationStr,Application,Dir,Vm},_From,State) ->
-    Reply=cluster_lib:stop_app(ApplicationStr,Application,Dir,Vm),
-    {reply, Reply, State};
-handle_call({app_status,Vm,Application},_From,State) ->
-    Reply=cluster_lib:app_status(Vm,Application),
-    {reply, Reply, State};
 
 handle_call({ping},_From,State) ->
     Reply={pong,node(),?MODULE},

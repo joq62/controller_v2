@@ -6,6 +6,8 @@
 %%% Creates and deletes Pods
 %%% 
 %%% API-kube: Interface 
+%%% Pod consits beams from all services, app and app and sup erl.
+%%% The setup of envs is
 %%% -------------------------------------------------------------------
 -module(kubelet).  
 -behaviour(gen_server).
@@ -15,9 +17,7 @@
 %% --------------------------------------------------------------------
 
 %% --------------------------------------------------------------------
--define(HostFile,"glurk").
--define(HostConfigDir,"g").
--define(GitHostConfigCmd,"g").
+
 %% --------------------------------------------------------------------
 %% Key Data structures
 %% 
@@ -45,7 +45,7 @@
 	 add_pod_spec/2,
 	 delete_pod_spec/1,
 	 create_pod/2,
-	 create_pod/5,
+	 create_pod/4,
 	 delete_pod/1,
 	 get_pods/0,
 
@@ -108,8 +108,8 @@ add_pod_spec(PodName,Spec)->
     gen_server:call(?MODULE, {add_pod_spec,PodName,Spec},infinity).
 delete_pod_spec(PodName)->
     gen_server:call(?MODULE, {delete_pod_spec,PodName},infinity).
-create_pod(Id,Vsn,Apps,Env,Hosts)->
-    gen_server:call(?MODULE, {create_pod,Id,Vsn,Apps,Env,Hosts},infinity).
+create_pod(PodId,Vsn,Apps,Env)->
+    gen_server:call(?MODULE, {create_pod,PodId,Vsn,Apps,Env},infinity).
 
 create_pod(PodName,Spec)->
     gen_server:call(?MODULE, {create_pod,PodName,Spec},infinity).
@@ -183,7 +183,7 @@ ping()->
 %% --------------------------------------------------------------------
 init([]) ->
    
-    {ok, #state{}}.
+    {ok, #state{pods=[]}}.
     
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -199,27 +199,39 @@ handle_call({get_pods},_From,State) ->
     Reply=State#state.pods,
     {reply, Reply, State};
 
-handle_call({create_pod,Id,Vsn,Apps,Env,Hosts},_From,State) ->
-    Reply=case rpc:call(node(),pod,create,[Id,Vsn,Apps,Env,Hosts]) of
+handle_call({create_pod,PodId,Vsn,Apps,Env},_From,State) ->
+    Reply=case rpc:call(node(),pod_server,create,[PodId,Vsn,Apps,Env]) of
 	      {ok,Node,Dir}->
 		  PodList=State#state.pods,
-		  NewPods=[{Id,Node,Dir,date(),time()}|PodList],
+		  NewPods=[{PodId,Node,Dir,date(),time()}|PodList],
 		  NewState=State#state{pods=NewPods},
 		  {ok,Node};
 	      Error->
 		  NewState=State,
-		  {error,[Error,create_pod,Id,Vsn,Apps,Env,Hosts]}	  
+		  {error,[Error,create_pod,PodId,Vsn,Apps,Env]}	  
 	  end,
     {reply, Reply, NewState};
+
+handle_call({delete_pod,PodId},_From,State) ->
+
+    Reply=case lists:keyfind(PodId,1,State#state.pods) of
+	      {PodId,Node,Dir,_Date,_Time}->
+		  PodsList=lists:keydelete(PodId,1,State#state.pods),
+		  NewState=State#state{pods=PodsList},
+		  rpc:call(node(),pod_server,delete,[Node,Dir]);
+	      false->
+		  NewState=State,
+		  {error,[eexists,PodId]}
+	  end,
+    {reply, Reply,NewState};
+
 
 handle_call({create_pod,PodName,Spec},_From,State) ->
     PodId=rpc:call(node(),pod,create,[PodName,Spec]),
     Reply=PodId,
     {reply, Reply, State};
 
-handle_call({delete_pod,PodId},_From,State) ->
-    Reply=glurk,
-    {reply, Reply, State};
+
 
 handle_call({add_pod_spec,PodName,Spec},_From,State) ->
     Reply=glurk,
@@ -236,12 +248,11 @@ handle_call({start_slaves,HostId,SlaveNames,ErlCmd},_From,State) ->
 
 
 handle_call({read_config},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,read_config,[?HostFile],5000),
+    Reply=glurk,
     {reply, Reply, State};
 
 handle_call({load_config},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,load_config,[?HostConfigDir,?HostFile,?GitHostConfigCmd],2*5000),
-   
+    Reply=glurk,
     {reply, Reply, State};
 
 

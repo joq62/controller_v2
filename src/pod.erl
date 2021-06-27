@@ -22,15 +22,20 @@
 %% External functions
 %% ====================================================================
 
+delete(Node,Dir)->
+    slave:stop(Node),
+    os:cmd("rm -rf "++Dir),
+    ok.
+    
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-create(Id,_Vsn,AppInfo,EnvConfig,_Hosts) ->
+create(PodId,_Vsn,AppInfo,EnvConfig) ->
     % Unique PodId
     Unique=integer_to_list(erlang:system_time(millisecond)),
-    NodeId=Unique++"_"++Id,
+    NodeId=Unique++"_"++PodId,
     % Create unique dir
     ok=file:make_dir(NodeId),
     % clone application 
@@ -57,8 +62,6 @@ create(Id,_Vsn,AppInfo,EnvConfig,_Hosts) ->
     AppsSlave=rpc:call(Node,application,which_applications,[]),
     true=lists:keymember(App,1,AppsSlave),
     {ok,Node,NodeId}.
-   
-
 
 %% --------------------------------------------------------------------
 %% Function:start/0 

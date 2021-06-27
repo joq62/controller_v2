@@ -6,7 +6,7 @@ all:
 	rm -rf src/*.beam *.beam  test_src/*.beam test_ebin;
 	rm -rf  *~ */*~  erl_cra*;
 	rm -rf *_specs *_config *.log catalog;
-	rm -rf *_orginal*;
+	rm -rf *_pod*;
 
 	echo Done
 doc_gen:
@@ -14,13 +14,10 @@ doc_gen:
 unit_test:
 	rm -rf ebin/* src/*.beam *.beam test_src/*.beam test_ebin;
 	rm -rf  *~ */*~  erl_cra*;
-	rm -rf *_specs *_config *.log *_orginal*;
+	rm -rf *_specs *_config *.log *_pod*;
 #	support
 	cp ../support/src/support.app ebin;
 	erlc -o ebin ../support/src/*.erl;
-#	etcd
-	cp ../etcd/src/etcd.app ebin;
-	erlc -o ebin ../etcd/src/*.erl;
 #	kubelet
 	cp src/*.app ebin;
 	erlc -o ebin src/*.erl;
