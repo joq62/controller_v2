@@ -4,11 +4,12 @@
 %%% 
 %%% Created : 10 dec 2012
 %%% -------------------------------------------------------------------
--module(kubelet_test).   
+-module(mylog_test).   
    
 %% --------------------------------------------------------------------
 %% Include files
 %% --------------------------------------------------------------------
+-include("src/kube_logger.hrl").
 %-include_lib("eunit/include/eunit.hrl").
 %% --------------------------------------------------------------------
 
@@ -31,21 +32,21 @@ start()->
     ok=setup(),
     io:format("~p~n",[{"Stop setup",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-    io:format("~p~n",[{"Start pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
-    ok=pass_0(),
-    io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    io:format("~p~n",[{"Start pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    ok=pass_0(),
+ %   io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
     io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
     ok=pass_1(),
     io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-%    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
-%    ok=pass_2(),
-%    io:format("~p~n",[{"Stop pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    ok=pass_2(),
+    io:format("~p~n",[{"Stop pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-%    io:format("~p~n",[{"Start pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
-%    ok=pass_3(),
-%    io:format("~p~n",[{"Stop pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("~p~n",[{"Start pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    ok=pass_3(),
+    io:format("~p~n",[{"Stop pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
   %  io:format("~p~n",[{"Start pass_4()",?MODULE,?FUNCTION_NAME,?LINE}]),
   %  ok=pass_4(),
@@ -72,28 +73,9 @@ start()->
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_0()->
-    %Start one new pod orginal
-    []=kubelet:get_pods(),
-    Id="orginal_pod",
-    Vsn="1.0.0",
-    AppInfo={"orginal","1.0.0","https://github.com/joq62/orginal.git"},
-    Env=[],
-    Host=[],
-    {ok,Pod1}=kubelet:create_pod(Id,Vsn,AppInfo,Env),
-    [{"orginal_pod",
-      Node,
-      Dir,
-      _Date,
-      _Time}]=kubelet:get_pods(),
-    pong=net_adm:ping(Pod1),
-    {pong,_,support}=rpc:call(Pod1,support,ping,[]),
-    AppsSlave=rpc:call(Pod1,application,which_applications,[]),
-    true=lists:keymember(orginal,1,AppsSlave),
-    
-    %% Delete
-    ok=kubelet:delete_pod(Id),
-    []=kubelet:get_pods(),
-    {badrpc,nodedown}=rpc:call(Pod1,support,ping,[]),
+    mylog:log(loginfo),
+    mylog:alarm(alarminfo),
+    mylog:ticket(ticketinfo),
     ok.
 
 %% --------------------------------------------------------------------
@@ -101,8 +83,13 @@ pass_0()->
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
+
+
 pass_1()->
-    
+    {ok,_}=kube_logger:start(),
+    ok=kube_logger:log(?Logger("System restarted")),
+    ok=kube_logger:ticket(?Logger("check cluster status")),
+    ok=kube_logger:alarm(?Logger("lost host c1")),
     ok.
 
 %% --------------------------------------------------------------------
@@ -111,16 +98,24 @@ pass_1()->
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_2()->
-
+    ok=kube_logger:file_log(?Logger("System restarted")),
+    ok=kube_logger:file_ticket(?Logger("check cluster status")),
+    ok=kube_logger:file_alarm(?Logger("lost host c1")),
     ok.
 
 %% --------------------------------------------------------------------
-%% Function:start/0 
+%% Function:start/0 ,mylog_test,start,
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_3()->
-  
+    db_logger:install([node()]),
+    application:start(mnesia),
+    timer:sleep(100),
+    {atomic,ok}=db_logger:create(?KubeLog(log,"log1")),
+    {atomic,ok}=db_logger:create(?KubeLog(log,"log1")),
+
+    glurk=db_logger:severity(log),
     ok.
 
 %% --------------------------------------------------------------------

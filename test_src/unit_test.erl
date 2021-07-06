@@ -3,7 +3,7 @@
 %%% @doc : represent a logical vm  
 %%% 
 %%% Supports the system with standard erlang vm functionality, load and start
-%%% of an erlang application (downloaded from git hub) and "dns" support 
+%%% of an erlang application (downloa1ded from git hub) and "dns" support 
 %%% 
 %%% Make and start the board start SW.
 %%%  boot_service initiates tcp_server and l0isten on port
@@ -84,7 +84,7 @@ ping()->
 %% Server functions
 %% ====================================================================
 -define(TestSuit,[{app_start_test,start,[],20*5000}
-		 ,{kubelet_test,start,[],20*5000}
+		 ,{mylog_test,start,[],20*5000}
 	%	 ,{acces_test,start,[],4*5000} %%%,
 	%	 ,{clone_test,start,[],4*5000}
 	%	 ,{start_vm_test,start,[],4*5000}

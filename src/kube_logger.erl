@@ -1,15 +1,19 @@
 %%% -------------------------------------------------------------------
 %%% @author  : Joq Erlang
 %%% @doc: : 
-%%% Created :
-%%% Node end point 
-%%% Creates and deletes Pods
-%%% 
-%%% API-kube: Interface 
-%%% Pod consits beams from all services, app and app and sup erl.
-%%% The setup of envs is
+%%% Created : 
+%%% Pod is an erlang vm and 1-n erlang applications (containers) 
+%%% Pods network id is the node name  
+%%% The pod lives as long as the applications is living 
+%%% In each pod there is a mnesias dbase
+%%% Pod template {apiVersion, kind, metadata,[{namen,striang}]
+%%%               spec,[{containers,[{name,},{image,busybox},
+%%%                     {command,['erl cmd]},restart policy]
+%%% storage in Pod
+%%% File System:
+%%%  
 %%% -------------------------------------------------------------------
--module(kubelet).  
+-module(kube_logger).   
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -22,7 +26,7 @@
 %% Key Data structures
 %% 
 %% --------------------------------------------------------------------
--record(state, {pods}).
+-record(state, {event_ref,file_descriptor}).
 
 
 
@@ -42,38 +46,9 @@
 
 % OaM related
 -export([
-	 add_pod_spec/2,
-	 delete_pod_spec/1,
-	 create_pod/2,
-	 create_pod/4,
-	 delete_pod/1,
-	 get_pods/0,
-
-	 load_config/0,
-	 read_config/0,
-	 status_hosts/0,
-	 status_slaves/0,
-	 start_masters/1,
-	 start_slaves/3,
-	 start_slaves/1,
-	 running_hosts/0,
-	 running_slaves/0,
-	 missing_hosts/0,
-	 missing_slaves/0
-	]).
-
--export([
-
-	 install/0,
-	 available_hosts/0
-
-	]).
-
-
--export([boot/0,
-	 start_app/5,
-	 stop_app/4,
-	 app_status/2
+	 log/1,ticket/1,alarm/1,
+	 file_log/1,file_ticket/1,file_alarm/1
+       
 	]).
 
 -export([start/0,
@@ -91,9 +66,6 @@
 
 %% Asynchrounus Signals
 
-boot()->
-    application:start(?MODULE).
-
 %% Gen server functions
 
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -101,69 +73,29 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 
 %%---------------------------------------------------------------
-get_pods()->
-    gen_server:call(?MODULE, {get_pods},infinity).
 
-add_pod_spec(PodName,Spec)->
-    gen_server:call(?MODULE, {add_pod_spec,PodName,Spec},infinity).
-delete_pod_spec(PodName)->
-    gen_server:call(?MODULE, {delete_pod_spec,PodName},infinity).
-create_pod(PodId,Vsn,Apps,Env)->
-    gen_server:call(?MODULE, {create_pod,PodId,Vsn,Apps,Env},infinity).
 
-create_pod(PodName,Spec)->
-    gen_server:call(?MODULE, {create_pod,PodName,Spec},infinity).
-delete_pod(PodId)->
-    gen_server:call(?MODULE, {delete_pod,PodId},infinity).
-    
-delete(Name)->
-    gen_server:call(?MODULE, {delete,Name},infinity).    
 
 %%---------------------------------------------------------------
-running_hosts()->
-       gen_server:call(?MODULE, {running_hosts},infinity).
-running_slaves()->
-       gen_server:call(?MODULE, {running_slaves},infinity).
-missing_hosts()->
-       gen_server:call(?MODULE, {missing_hosts},infinity).
-missing_slaves()->
-       gen_server:call(?MODULE, {missing_slaves},infinity).
 
-load_config()-> 
-    gen_server:call(?MODULE, {load_config},infinity).
-read_config()-> 
-    gen_server:call(?MODULE, {read_config},infinity).
-status_hosts()-> 
-    gen_server:call(?MODULE, {status_hosts},infinity).
-status_slaves()-> 
-    gen_server:call(?MODULE, {status_slaves},infinity).
-
-start_masters(HostIds)->
-    gen_server:call(?MODULE, {start_masters,HostIds},infinity).
-start_slaves(HostIds)->
-    gen_server:call(?MODULE, {start_slaves,HostIds},infinity).
-
-start_slaves(HostId,SlaveNames,ErlCmd)->
-    gen_server:call(?MODULE, {start_slaves,HostId,SlaveNames,ErlCmd},infinity).
     
-%% old
-install()-> 
-    gen_server:call(?MODULE, {install},infinity).
-available_hosts()-> 
-    gen_server:call(?MODULE, {available_hosts},infinity).
-
-start_app(ApplicationStr,Application,CloneCmd,Dir,Vm)-> 
-    gen_server:call(?MODULE, {start_app,ApplicationStr,Application,CloneCmd,Dir,Vm},infinity).
-
-stop_app(ApplicationStr,Application,Dir,Vm)-> 
-    gen_server:call(?MODULE, {stop_app,ApplicationStr,Application,Dir,Vm},infinity).
-
-app_status(Vm,Application)-> 
-    gen_server:call(?MODULE, {app_status,Vm,Application},infinity).
 ping()-> 
     gen_server:call(?MODULE, {ping},infinity).
 
 %%-----------------------------------------------------------------------
+log(LogInfo)-> 
+    gen_server:cast(?MODULE, {log,LogInfo}).
+ticket(TicketInfo)-> 
+    gen_server:cast(?MODULE, {ticket,TicketInfo}).
+alarm(AlarmInfo)-> 
+    gen_server:cast(?MODULE, {alarm,AlarmInfo}).
+
+file_log(LogInfo)-> 
+    gen_server:cast(?MODULE, {file_log,LogInfo}).
+file_ticket(TicketInfo)-> 
+    gen_server:cast(?MODULE, {file_ticket,TicketInfo}).
+file_alarm(AlarmInfo)-> 
+    gen_server:cast(?MODULE, {file_alarm,AlarmInfo}).
 
 %%----------------------------------------------------------------------
 
@@ -182,8 +114,16 @@ ping()->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-   
-    {ok, #state{pods=[]}}.
+    {ok,Fd}=file:open(?MODULE,write),    
+    
+  %  mnesia:stop(),
+  %  mnesia:delete_schema([node()]),
+  %  mnesia:start(),
+    
+    {ok,Ref}=gen_event:start(),
+    ok=gen_event:add_handler(Ref,kube_events,{}),
+    
+    {ok, #state{event_ref=Ref,file_descriptor=Fd}}.
     
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -195,81 +135,8 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
-handle_call({get_pods},_From,State) ->
-    Reply=State#state.pods,
-    {reply, Reply, State};
-
-handle_call({create_pod,PodId,Vsn,Apps,Env},_From,State) ->
-    Reply=case rpc:call(node(),pod_server,create,[PodId,Vsn,Apps,Env]) of
-	      {ok,Node,Dir}->
-		  PodList=State#state.pods,
-		  NewPods=[{PodId,Node,Dir,date(),time()}|PodList],
-		  NewState=State#state{pods=NewPods},
-		  {ok,Node};
-	      Error->
-		  NewState=State,
-		  {error,[Error,create_pod,PodId,Vsn,Apps,Env]}	  
-	  end,
-    {reply, Reply, NewState};
-
-handle_call({delete_pod,PodId},_From,State) ->
-
-    Reply=case lists:keyfind(PodId,1,State#state.pods) of
-	      {PodId,Node,Dir,_Date,_Time}->
-		  PodsList=lists:keydelete(PodId,1,State#state.pods),
-		  NewState=State#state{pods=PodsList},
-		  rpc:call(node(),pod_server,delete,[Node,Dir]);
-	      false->
-		  NewState=State,
-		  {error,[eexists,PodId]}
-	  end,
-    {reply, Reply,NewState};
 
 
-handle_call({create_pod,PodName,Spec},_From,State) ->
-    PodId=rpc:call(node(),pod,create,[PodName,Spec]),
-    Reply=PodId,
-    {reply, Reply, State};
-
-
-
-handle_call({add_pod_spec,PodName,Spec},_From,State) ->
-    Reply=glurk,
-    {reply, Reply, State};
-handle_call({delete_pod_spec,PodName},_From,State) ->
-    Reply=glurk,
-    {reply, Reply, State};
-
-
-handle_call({start_slaves,HostId,SlaveNames,ErlCmd},_From,State) ->
-    Master=list_to_atom("master"++"@"++HostId),
-    Reply=rpc:call(node(),cluster_lib,start_slaves,[Master,HostId,SlaveNames,ErlCmd],2*5000),
-    {reply, Reply, State};
-
-
-handle_call({read_config},_From,State) ->
-    Reply=glurk,
-    {reply, Reply, State};
-
-handle_call({load_config},_From,State) ->
-    Reply=glurk,
-    {reply, Reply, State};
-
-
-handle_call({install},_From,State) ->
-    Reply=rpc:call(node(),cluster_lib,install,[],2*5000),
-    {reply, Reply, State};
-
-
-handle_call({start_app,ApplicationStr,Application,CloneCmd,Dir,Vm},_From,State) ->
-    Reply=cluster_lib:start_app(ApplicationStr,Application,CloneCmd,Dir,Vm),
-    {reply, Reply, State};
-handle_call({stop_app,ApplicationStr,Application,Dir,Vm},_From,State) ->
-    Reply=cluster_lib:stop_app(ApplicationStr,Application,Dir,Vm),
-    {reply, Reply, State};
-handle_call({app_status,Vm,Application},_From,State) ->
-    Reply=cluster_lib:app_status(Vm,Application),
-    {reply, Reply, State};
 
 handle_call({ping},_From,State) ->
     Reply={pong,node(),?MODULE},
@@ -290,6 +157,28 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% -------------------------------------------------------------------
     
+handle_cast({log,LogInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{log,LogInfo}),
+    {noreply, State};
+handle_cast({ticket,TicketInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{ticket,TicketInfo}),
+  %  io:format("ticket,TicketInfo  ~p~n",[{?MODULE,?LINE,ticket,TicketInfo}]),
+    {noreply, State};
+handle_cast({alarm,AlarmInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{alarm,AlarmInfo}),
+ %   io:format("alarm,AlarmInfo ~p~n",[{?MODULE,?LINE,alarm,AlarmInfo}]),
+    {noreply, State};
+
+handle_cast({file_log,LogInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_log,State#state.file_descriptor,LogInfo}),
+    {noreply, State};
+handle_cast({file_ticket,TicketInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_ticket,State#state.file_descriptor,TicketInfo}),
+    {noreply, State};
+handle_cast({file_alarm,AlarmInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_alarm,State#state.file_descriptor,AlarmInfo}),
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{?MODULE,?LINE,Msg}]),
     {noreply, State}.

@@ -1,19 +1,15 @@
 %%% -------------------------------------------------------------------
 %%% @author  : Joq Erlang
 %%% @doc: : 
-%%% Created : 
-%%% Pod is an erlang vm and 1-n erlang applications (containers) 
-%%% Pods network id is the node name  
-%%% The pod lives as long as the applications is living 
-%%% In each pod there is a mnesias dbase
-%%% Pod template {apiVersion, kind, metadata,[{namen,striang}]
-%%%               spec,[{containers,[{name,},{image,busybox},
-%%%                     {command,['erl cmd]},restart policy]
-%%% storage in Pod
-%%% File System:
-%%%  
+%%% Created :
+%%% Node end point  
+%%% Creates and deletes Pods
+%%% 
+%%% API-kube: Interface 
+%%% Pod consits beams from all services, app and app and sup erl.
+%%% The setup of envs is
 %%% -------------------------------------------------------------------
--module(pod_server).   
+-module(mylog).  
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -26,7 +22,7 @@
 %% Key Data structures
 %% 
 %% --------------------------------------------------------------------
--record(state, {cookie,cluster_name}).
+-record(state, {}).
 
 
 
@@ -46,13 +42,9 @@
 
 % OaM related
 -export([
-	 start_slaves/3
-	]).
-
--export([
-	 create/2,
-	 create/4,
-	 delete/2
+	 log/1,
+	 ticket/1,
+	 alarm/1
 	]).
 
 -export([start/0,
@@ -70,6 +62,7 @@
 
 %% Asynchrounus Signals
 
+
 %% Gen server functions
 
 start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -78,26 +71,18 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 
 %%---------------------------------------------------------------
 
-create(Id,Vsn,Apps,Env)->
-    gen_server:call(?MODULE, {create,Id,Vsn,Apps,Env},infinity).
-
-create(PodId,Spec)->
-    gen_server:call(?MODULE, {create,PodId,Spec},infinity).
-delete(Node,Dir)->
-    gen_server:call(?MODULE, {delete,Node,Dir},infinity).    
-
-%%---------------------------------------------------------------
-
-start_slaves(HostId,SlaveNames,ErlCmd)->
-    gen_server:call(?MODULE, {start_slaves,HostId,SlaveNames,ErlCmd},infinity).
-    
 ping()-> 
     gen_server:call(?MODULE, {ping},infinity).
 
 %%-----------------------------------------------------------------------
 
 %%----------------------------------------------------------------------
-
+log(Info)-> 
+    gen_server:cast(?MODULE, {log,Info}).
+ticket(Info)-> 
+    gen_server:cast(?MODULE, {ticket,Info}).
+alarm(Info)-> 
+    gen_server:cast(?MODULE, {alarm,Info}).
 
 %% ====================================================================
 %% Server functions
@@ -113,7 +98,7 @@ ping()->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-  
+   
     {ok, #state{}}.
     
 %% --------------------------------------------------------------------
@@ -126,27 +111,6 @@ init([]) ->
 %%          {stop, Reason, Reply, State}   | (terminate/2 is called)
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
-
-handle_call({delete,Node,Dir},_From,State) ->
-    
-    Reply=rpc:call(node(),pod,delete,[Node,Dir]),
-    {reply, Reply, State};
-
-handle_call({create,PodId,Vsn,App,Env},_From,State) ->
-    
-    Reply=rpc:call(node(),pod,create,[PodId,Vsn,App,Env]),
-    {reply, Reply, State};
-
-
-handle_call({create,PodId,Spec},_From,State) ->
-    %[{App,GitPath}]
-    Unique=integer_to_list(erlang:system_time(millisecond)),
-    NodeId=Unique++"_"++PodId,
-    {ok,Host}=inet:gethostname(),
-    {ok,Node}=slave:start(Host,NodeId),
-    Reply={ok,Node},
-    {reply, Reply, State};
-
 
 handle_call({ping},_From,State) ->
     Reply={pong,node(),?MODULE},
@@ -167,6 +131,18 @@ handle_call(Request, From, State) ->
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% -------------------------------------------------------------------
     
+handle_cast({log,Info}, State) ->
+ 
+    {noreply, State};
+
+handle_cast({ticket,Info}, State) ->
+ 
+    {noreply, State};
+
+handle_cast({alarm,Info}, State) ->
+ 
+    {noreply, State};
+
 handle_cast(Msg, State) ->
     io:format("unmatched match cast ~p~n",[{?MODULE,?LINE,Msg}]),
     {noreply, State}.

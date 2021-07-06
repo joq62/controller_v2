@@ -1,12 +1,13 @@
 all:
 #	service
-	rm ebin/*;
-	cp src/*.app ebin;
+	rm -rf ebin/*;
 	erlc -o ebin src/*.erl;
 	rm -rf src/*.beam *.beam  test_src/*.beam test_ebin;
 	rm -rf  *~ */*~  erl_cra*;
 	rm -rf *_specs *_config *.log catalog;
 	rm -rf *_pod*;
+	rm -rf Mn* kube_logger;
+	erlc -o ebin src/*.erl;
 
 	echo Done
 doc_gen:
@@ -19,7 +20,6 @@ unit_test:
 	cp ../support/src/support.app ebin;
 	erlc -o ebin ../support/src/*.erl;
 #	kubelet
-	cp src/*.app ebin;
 	erlc -o ebin src/*.erl;
 #	test application
 	mkdir test_ebin;
@@ -27,5 +27,5 @@ unit_test:
 	erlc -o test_ebin test_src/*.erl;
 	erl -pa ebin -pa test_ebin\
 	    -setcookie abc\
-	    -sname test_kubelete\
+	    -sname test_mylog\
 	    -run unit_test start_test test_src/test.config
