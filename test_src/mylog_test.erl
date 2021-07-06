@@ -36,13 +36,13 @@ start()->
 %    ok=pass_0(),
  %   io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-    io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
-    ok=pass_1(),
-    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    ok=pass_1(),
+%    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
-    ok=pass_2(),
-    io:format("~p~n",[{"Stop pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    ok=pass_2(),
+%    io:format("~p~n",[{"Stop pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
     io:format("~p~n",[{"Start pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
     ok=pass_3(),
@@ -109,13 +109,36 @@ pass_2()->
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_3()->
-    db_logger:install([node()]),
+    os:cmd("rm -rf Mn*"),
+    db_logger:install(),
     application:start(mnesia),
     timer:sleep(100),
     {atomic,ok}=db_logger:create(?KubeLog(log,"log1")),
     {atomic,ok}=db_logger:create(?KubeLog(log,"log1")),
+    {atomic,ok}=db_logger:create(?KubeLog(ticket,"ticket1")),
+    {atomic,ok}=db_logger:create(?KubeLog(alarm,"alarm1")),
 
-    glurk=db_logger:severity(log),
+    [{_,new,log,
+      {2021,7,_},
+      {_,_,_},
+      'test_mylog@joq62-X550CA',mylog_test,pass_3,
+      _,"log1"},
+     {_,new,log,
+      {2021,7,_},
+      {_,_,_},
+      'test_mylog@joq62-X550CA',mylog_test,pass_3,
+      _,"log1"}]=db_logger:severity(log),
+    [{_,new,ticket,
+      {2021,7,_},
+      {_,_,_},
+      'test_mylog@joq62-X550CA',mylog_test,pass_3,
+      _,"ticket1"}]=db_logger:severity(ticket),
+    [{_,new,alarm,
+     {2021,7,_},
+     {_,_,_},
+     'test_mylog@joq62-X550CA',mylog_test,pass_3,
+     _,"alarm1"}]=db_logger:severity(alarm),
+    
     ok.
 
 %% --------------------------------------------------------------------
@@ -124,7 +147,7 @@ pass_3()->
 %% Returns: non
 %% --------------------------------------------------------------------
 pass_4()->
-  
+    
     ok.
 
 

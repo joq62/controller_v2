@@ -26,7 +26,6 @@
 
  
 severity(Key)->
-    
     Z=do(qlc:q([X || X <- mnesia:table(?TABLE)])),
     L1=[{Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}||{?RECORD,Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}<-Z,
 								      Key==Severity],
@@ -40,14 +39,16 @@ latest(Len,all)->
    lists:sublist(read_all(),Len).
 
 % End Special
-install(Nodes)->
-    mnesia:create_schema(Nodes),
+
+delete_install()->
+    ok.
+    
+install()->
+    mnesia:create_schema([node()]),
     application:start(mnesia),
- %   mnesia:create_table(?TABLE, [{attributes, record_info(fields, ?RECORD)},
-%				{type,bag}]),
     mnesia:create_table(?TABLE, [{attributes, record_info(fields, ?RECORD)},
 				{type,bag},
-				{disc_copies,Nodes}]),
+				{disc_copies,[node()]}]),
     mnesia:wait_for_tables([?TABLE], 20000),
     application:stop(mnesia),
     ok.
@@ -71,7 +72,7 @@ create({Severity,Date,Time,Module,FunctionName,Line,Node,Info})->
 		    function_name=FunctionName,
 		    line=Line,
 		    info=Info},
-    io:format("Record = ~p~n",[Record]),
+  %  io:format("Record = ~p~n",[Record]),
     F = fun() -> mnesia:write(Record) end,
     mnesia:transaction(F).
 
