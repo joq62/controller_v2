@@ -12,6 +12,9 @@ all:
 	echo Done
 doc_gen:
 	echo glurk not implemented
+monitor:
+	erlc -o ebin src/monitor.erl;
+	erl -pa ebin -s monitor start -sname monitor -setcookie abc 
 unit_test:
 	rm -rf ebin/* src/*.beam *.beam test_src/*.beam test_ebin;
 	rm -rf  *~ */*~  erl_cra*;

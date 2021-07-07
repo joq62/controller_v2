@@ -13,7 +13,7 @@
 %%% File System:
 %%%  
 %%% -------------------------------------------------------------------
--module(kube_logger).   
+-module(monitor).   
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -26,8 +26,7 @@
 %% Key Data structures
 %% 
 %% --------------------------------------------------------------------
--record(state, {event_ref,file_descriptor,
-		monitor_node}).
+-record(state, {}).
 
 
 
@@ -47,9 +46,7 @@
 
 % OaM related
 -export([
-	 log/1,ticket/1,alarm/1,
-	 file_log/1,file_ticket/1,file_alarm/1,
-	 add_monitor/1
+	 print/2
        
 	]).
 
@@ -81,26 +78,12 @@ stop()-> gen_server:call(?MODULE, {stop},infinity).
 %%---------------------------------------------------------------
 
     
-add_monitor(Node)-> 
-    gen_server:call(?MODULE, {add_monitor,Node},infinity).
-    
 ping()-> 
     gen_server:call(?MODULE, {ping},infinity).
 
 %%-----------------------------------------------------------------------
-log(LogInfo)-> 
-    gen_server:cast(?MODULE, {log,LogInfo}).
-ticket(TicketInfo)-> 
-    gen_server:cast(?MODULE, {ticket,TicketInfo}).
-alarm(AlarmInfo)-> 
-    gen_server:cast(?MODULE, {alarm,AlarmInfo}).
-
-file_log(LogInfo)-> 
-    gen_server:cast(?MODULE, {file_log,LogInfo}).
-file_ticket(TicketInfo)-> 
-    gen_server:cast(?MODULE, {file_ticket,TicketInfo}).
-file_alarm(AlarmInfo)-> 
-    gen_server:cast(?MODULE, {file_alarm,AlarmInfo}).
+print(Severity,Info)-> 
+    gen_server:cast(?MODULE, {print,Severity,Info}).
 
 %%----------------------------------------------------------------------
 
@@ -119,17 +102,8 @@ file_alarm(AlarmInfo)->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-    {ok,Fd}=file:open(?MODULE,write),    
-    
-  %  mnesia:stop(),
-  %  mnesia:delete_schema([node()]),
-  %  mnesia:start(),
-    
-    {ok,Ref}=gen_event:start(),
-    ok=gen_event:add_handler(Ref,kube_events,{}),
-    
-    {ok, #state{event_ref=Ref,file_descriptor=Fd,
-		monitor_node=not_defined}}.
+ 
+    {ok, #state{}}.
     
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -142,10 +116,6 @@ init([]) ->
 %%          {stop, Reason, State}            (aterminate/2 is called)
 %% --------------------------------------------------------------------
 
-
-
-handle_call({add_monitor,Node},_From,State) ->
-    {reply,ok, State#state{monitor_node=Node}};
 
 handle_call({ping},_From,State) ->
     Reply={pong,node(),?MODULE},
@@ -167,18 +137,8 @@ handle_call(Request, From, State) ->
 %% -------------------------------------------------------------------
 
     
-handle_cast({Severity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{Severity,Info}),
-    case State#state.monitor_node of
-	node_defined->
-	    ok;
-	Node->
-	    rpc:call(Node,monitor,print,[Severity,Info])
-    end,
-    {noreply, State};
-
-handle_cast({FileSeverity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{FileSeverity,State#state.file_descriptor,Info}),
+handle_cast({print,Severity,Info}, State) ->
+    io:format("~p~n",[{Severity,Info}]),  
     {noreply, State};
 
 handle_cast(Msg, State) ->

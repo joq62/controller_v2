@@ -36,17 +36,17 @@ start()->
 %    ok=pass_0(),
  %   io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-%    io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
-%    ok=pass_1(),
-%    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    ok=pass_1(),
+    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
 %    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
 %    ok=pass_2(),
 %    io:format("~p~n",[{"Stop pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-    io:format("~p~n",[{"Start pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
-    ok=pass_3(),
-    io:format("~p~n",[{"Stop pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
+  %  io:format("~p~n",[{"Start pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
+  %  ok=pass_3(),
+  %  io:format("~p~n",[{"Stop pass_3()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
   %  io:format("~p~n",[{"Start pass_4()",?MODULE,?FUNCTION_NAME,?LINE}]),
   %  ok=pass_4(),
@@ -87,6 +87,7 @@ pass_0()->
 
 pass_1()->
     {ok,_}=kube_logger:start(),
+    ok=kube_logger:add_monitor('monitor@joq62-X550CA'),
     ok=kube_logger:log(?Logger("System restarted")),
     ok=kube_logger:ticket(?Logger("check cluster status")),
     ok=kube_logger:alarm(?Logger("lost host c1")),
@@ -175,7 +176,7 @@ pass_5()->
 %% --------------------------------------------------------------------
 -define(APP,kubelet). 
 setup()->
-   
+    
     ok.
 
 

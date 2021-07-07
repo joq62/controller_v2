@@ -48,8 +48,7 @@
 % OaM related
 -export([
 	 log/1,ticket/1,alarm/1,
-	 file_log/1,file_ticket/1,file_alarm/1,
-	 add_monitor/1
+	 file_log/1,file_ticket/1,file_alarm/1
        
 	]).
 
@@ -167,18 +166,27 @@ handle_call(Request, From, State) ->
 %% -------------------------------------------------------------------
 
     
-handle_cast({Severity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{Severity,Info}),
-    case State#state.monitor_node of
-	node_defined->
-	    ok;
-	Node->
-	    rpc:call(Node,monitor,print,[Severity,Info])
-    end,
+handle_cast({log,LogInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{log,LogInfo}),
     {noreply, State};
 
-handle_cast({FileSeverity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{FileSeverity,State#state.file_descriptor,Info}),
+handle_cast({ticket,TicketInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{ticket,TicketInfo}),
+  %  io:format("ticket,TicketInfo  ~p~n",[{?MODULE,?LINE,ticket,TicketInfo}]),
+    {noreply, State};
+handle_cast({alarm,AlarmInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{alarm,AlarmInfo}),
+ %   io:format("alarm,AlarmInfo ~p~n",[{?MODULE,?LINE,alarm,AlarmInfo}]),
+    {noreply, State};
+
+handle_cast({file_log,LogInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_log,State#state.file_descriptor,LogInfo}),
+    {noreply, State};
+handle_cast({file_ticket,TicketInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_ticket,State#state.file_descriptor,TicketInfo}),
+    {noreply, State};
+handle_cast({file_alarm,AlarmInfo}, State) ->
+    gen_event:notify(State#state.event_ref,{file_alarm,State#state.file_descriptor,AlarmInfo}),
     {noreply, State};
 
 handle_cast(Msg, State) ->
