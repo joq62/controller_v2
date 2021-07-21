@@ -32,13 +32,18 @@ start()->
     ok=setup(),
     io:format("~p~n",[{"Stop setup",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-%    io:format("~p~n",[{"Start pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
-%    ok=pass_0(),
- %   io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+ %   io:format("~p~n",[{"Start cli_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+  %  ok=cli_0(),
+  %  io:format("~p~n",[{"Stop cli_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
-    io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
-    ok=pass_1(),
-    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+
+    io:format("~p~n",[{"Start pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+    ok=pass_0(),
+    io:format("~p~n",[{"Stop pass_0()",?MODULE,?FUNCTION_NAME,?LINE}]),
+
+ %   io:format("~p~n",[{"Start pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
+%    ok=pass_1(),
+%    io:format("~p~n",[{"Stop pass_1()",?MODULE,?FUNCTION_NAME,?LINE}]),
 
 %    io:format("~p~n",[{"Start pass_2()",?MODULE,?FUNCTION_NAME,?LINE}]),
 %    ok=pass_2(),
@@ -72,12 +77,30 @@ start()->
 %% Description: Initiate the eunit tests, set upp needed processes etc
 %% Returns: non
 %% --------------------------------------------------------------------
-pass_0()->
-    mylog:log(loginfo),
-    mylog:alarm(alarminfo),
-    mylog:ticket(ticketinfo),
+cli_0()->
+    {ok,_}=cli:start(),
+    ok=cli:print(log,"no monitor"),
+    N='monitor@joq62-X550CA',
+    ok=cli:monitor(N),
+    N=cli:where_is_monitor(),
+    ok=cli:print(log,"with monitor"),
     ok.
 
+%% --------------------------------------------------------------------
+%% Function:start/0 
+%% Description: Initiate the eunit tests, set upp needed processes etc
+%% Returns: non
+%% --------------------------------------------------------------------
+pass_0()->
+    kube_logger:start(),
+%    {ok,_}=kube_logger:start(),
+    ok=kube_logger:add_monitor('monitor@joq62-X550CA'),
+    ok=kube_logger:log_msg(?KubeLog(log,"l1")),
+    ok=kube_logger:log_msg(?KubeLog(ticket,"t1")),
+    ok=kube_logger:log_msg(?KubeLog(alert,"a1")),
+    timer:sleep(3000),
+    pass_0().
+    %ok.
 %% --------------------------------------------------------------------
 %% Function:start/0 
 %% Description: Initiate the eunit tests, set upp needed processes etc

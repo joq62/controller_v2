@@ -3,21 +3,7 @@
 -compile(export_all).
 
 -include_lib("stdlib/include/qlc.hrl").
-
--record(kube_logger,
-	{
-	 id,
-	 status,
-	 severity,
-	 date,
-	 time,
-	 node,
-	 module,
-	 function_name,
-	 line,
-	 info
-	}).
-
+-include("src/kube_logger.hrl").
 
 -define(TABLE,kube_logger).
 -define(RECORD,kube_logger).
@@ -58,7 +44,7 @@ create_table()->
 				{type,bag}]),
     mnesia:wait_for_tables([?TABLE], 20000).
 
-create({Severity,Date,Time,Module,FunctionName,Line,Node,Info})->
+create({Severity,Date,Time,Application,Module,FunctionName,Line,Node,Info})->
   %  io:format("{Severity,Date,Time,Module,FunctionName,Line,Node,Info} = ~p~n",[{Severity,Date,Time,Module,FunctionName,Line,Node,Info}]),
     Id=erlang:system_time(microsecond),
     Record=#?RECORD{
@@ -68,6 +54,7 @@ create({Severity,Date,Time,Module,FunctionName,Line,Node,Info})->
 		    date=Date,
 		    time=Time,
 		    node=Node,
+		    application=Application,
 		    module=Module,
 		    function_name=FunctionName,
 		    line=Line,
@@ -78,7 +65,7 @@ create({Severity,Date,Time,Module,FunctionName,Line,Node,Info})->
 
 read_all() ->
     Z=do(qlc:q([X || X <- mnesia:table(?TABLE)])),
-    L1=[{Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}||{?RECORD,Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}<-Z],
+    L1=[{Id,Status,Severity,Date,Time,Node,Application,Module,FunctionName,Line,Info}||{?RECORD,Id,Status,Severity,Date,Time,Node,Application,Module,FunctionName,Line,Info}<-Z],
  %   io:format("L1 = ~p~n",[L1]),
   %  L2=sort_by_date(L1),
   %  lists:reverse(L2).
@@ -108,16 +95,9 @@ do(Q) ->
 %%-------------------------------------------------------------------------
 sort_by_date([])->
     [];
-%sort_by_date([{Severity,Vm,Module,Line,Date,Time,DateTime,Text}|T]) ->
-%    sort_by_date([{XSeverity,XVm,XModule,XLine,XDate,XTime,XDateTime,XText}||{XSeverity,XVm,XModule,XLine,XDate,XTime,XDateTime,XText}<-T,
-%									     XDateTime=<DateTime])
-%	++[{Severity,Vm,Module,Line,Date,Time,Text}]++
-%	sort_by_date([{XSeverity,XVm,XModule,XLine,XDate,XTime,XDateTime,XText}||{XSeverity,XVm,XModule,XLine,XDate,XTime,XDateTime,XText}<-T,
-%										 XDateTime>DateTime]).
-
-sort_by_date([{Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}|T]) ->
-    lists:append([sort_by_date([{XId,XStatus,XSeverity,XDate,XTime,XNode,XModule,XFunctionName,XLine,XInfo}||{XId,XStatus,XSeverity,XDate,XTime,XNode,XModule,XFunctionName,XLine,XInfo}<-T,
+sort_by_date([{Id,Status,Severity,Date,Time,Node,Application,Module,FunctionName,Line,Info}|T]) ->
+    lists:append([sort_by_date([{XId,XStatus,XSeverity,XDate,XTime,XNode,XApplication,XModule,XFunctionName,XLine,XInfo}||{XId,XStatus,XSeverity,XDate,XTime,XNode,XApplication,XModule,XFunctionName,XLine,XInfo}<-T,
 													   XId=<Id]),
-	[{Id,Status,Severity,Date,Time,Node,Module,FunctionName,Line,Info}],
-		  sort_by_date([{XId,XStatus,XSeverity,XDate,XTime,XNode,XModule,XFunctionName,XLine,XInfo}||{XId,XStatus,XSeverity,XDate,XTime,XNode,XModule,XFunctionName,XLine,XInfo}<-T,
+	[{Id,Status,Severity,Date,Time,Node,Application,Module,FunctionName,Line,Info}],
+		  sort_by_date([{XId,XStatus,XSeverity,XDate,XTime,XNode,XApplication,XModule,XFunctionName,XLine,XInfo}||{XId,XStatus,XSeverity,XDate,XTime,XNode,XApplication,XModule,XFunctionName,XLine,XInfo}<-T,
 													   XId>Id])]).

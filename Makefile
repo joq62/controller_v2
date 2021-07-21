@@ -1,6 +1,7 @@
 all:
 #	service
 	rm -rf ebin/*;
+	rm -rf logs;
 	erlc -o ebin src/*.erl;
 	rm -rf src/*.beam *.beam  test_src/*.beam test_ebin;
 	rm -rf  *~ */*~  erl_cra*;
@@ -8,12 +9,10 @@ all:
 	rm -rf *_pod*;
 	rm -rf Mn* kube_logger;
 	erlc -o ebin src/*.erl;
-
-	echo Done
-doc_gen:
-	echo glurk not implemented
+	echo done
 monitor:
-	erlc -o ebin src/monitor.erl;
+	erlc -o ebin src/monitor_server.erl;
+	erlc -o ebin ../interfaces/monitor.erl;
 	erl -pa ebin -s monitor start -sname monitor -setcookie abc 
 unit_test:
 	rm -rf ebin/* src/*.beam *.beam test_src/*.beam test_ebin;
@@ -27,6 +26,7 @@ unit_test:
 #	test application
 	mkdir test_ebin;
 	cp test_src/*.app test_ebin;
+	erlc -o ebin ../interfaces/*.erl;
 	erlc -o test_ebin test_src/*.erl;
 	erl -pa ebin -pa test_ebin\
 	    -setcookie abc\

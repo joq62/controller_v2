@@ -13,7 +13,7 @@
 %%% File System:
 %%%  
 %%% -------------------------------------------------------------------
--module(kube_logger).   
+-module(kube_logger_server).   
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -46,17 +46,7 @@
 
 
 % OaM related
--export([
-	 log/1,ticket/1,alarm/1,
-	 file_log/1,file_ticket/1,file_alarm/1,
-	 add_monitor/1
-       
-	]).
 
--export([start/0,
-	 stop/0,
-	 ping/0
-	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -66,41 +56,12 @@
 %% External functions
 %% ====================================================================
 
-%% Asynchrounus Signals
-
-%% Gen server functions
-
-start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-stop()-> gen_server:call(?MODULE, {stop},infinity).
-
 
 %%---------------------------------------------------------------
 
 
 
-%%---------------------------------------------------------------
 
-    
-add_monitor(Node)-> 
-    gen_server:call(?MODULE, {add_monitor,Node},infinity).
-    
-ping()-> 
-    gen_server:call(?MODULE, {ping},infinity).
-
-%%-----------------------------------------------------------------------
-log(LogInfo)-> 
-    gen_server:cast(?MODULE, {log,LogInfo}).
-ticket(TicketInfo)-> 
-    gen_server:cast(?MODULE, {ticket,TicketInfo}).
-alarm(AlarmInfo)-> 
-    gen_server:cast(?MODULE, {alarm,AlarmInfo}).
-
-file_log(LogInfo)-> 
-    gen_server:cast(?MODULE, {file_log,LogInfo}).
-file_ticket(TicketInfo)-> 
-    gen_server:cast(?MODULE, {file_ticket,TicketInfo}).
-file_alarm(AlarmInfo)-> 
-    gen_server:cast(?MODULE, {file_alarm,AlarmInfo}).
 
 %%----------------------------------------------------------------------
 
@@ -119,17 +80,16 @@ file_alarm(AlarmInfo)->
 %
 %% --------------------------------------------------------------------
 init([]) ->
-    {ok,Fd}=file:open(?MODULE,write),    
+ %   {ok,Fd}=file:open(?MODULE,write),    
     
   %  mnesia:stop(),
   %  mnesia:delete_schema([node()]),
   %  mnesia:start(),
     
-    {ok,Ref}=gen_event:start(),
-    ok=gen_event:add_handler(Ref,kube_events,{}),
+%    {ok,Ref}=gen_event:start(),
+ %   ok=gen_event:add_handler(Ref,kube_events,{}),
     
-    {ok, #state{event_ref=Ref,file_descriptor=Fd,
-		monitor_node=not_defined}}.
+    {ok, #state{monitor_node=not_defined}}.
     
 %% --------------------------------------------------------------------
 %% Function: handle_call/3
@@ -165,20 +125,33 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% -------------------------------------------------------------------
-
+handle_cast({file,FileSeverity,Info}, State) ->
+    gen_event:notify(State#state.event_ref,{FileSeverity,State#state.file_descriptor,Info}),
+    {noreply, State};
     
-handle_cast({Severity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{Severity,Info}),
+handle_cast({kube_log,Info}, State) ->
+%    DbaseInfo=?LoggerDbase(Sev
+%    rpc:call(node(),db_logger,create,[M),
+%    gen_event:notify(State#state.event_ref,{Severity,Info}),
+%    case State#state.monitor_node of
+%	node_defined->
+%	    ok;
+%	Node->
+%	    rpc:call(Node,monitor,print,[Severity,Info])
+ %   end,
+    io:format("Info ~p~n",[Info]),
+    {noreply, State};
+
+handle_cast({log_msg,Info}, State) ->
+%    nice(Info),
     case State#state.monitor_node of
 	node_defined->
 	    ok;
 	Node->
-	    rpc:call(Node,monitor,print,[Severity,Info])
+	    rpc:cast(Node,monitor,print,[Info])
     end,
-    {noreply, State};
-
-handle_cast({FileSeverity,Info}, State) ->
-    gen_event:notify(State#state.event_ref,{FileSeverity,State#state.file_descriptor,Info}),
+    log_to_file(Info),
+%    io:format("Info ~w~n",[Info]),
     {noreply, State};
 
 handle_cast(Msg, State) ->
@@ -232,3 +205,96 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description:
 %% Returns: non
 %% --------------------------------------------------------------------
+-define(LogDir,"logs").
+-define(Latest,"latest.log").
+-include_lib("kernel/include/file.hrl").
+
+log_to_file(Info)->
+    case filelib:is_dir(?LogDir) of
+	false->
+	    file:make_dir(?LogDir),
+	    write_info(Info);
+	true ->
+	    write_info(Info)
+    end,
+    ok.
+
+
+write_info(Info)->
+    LogFile=filename:join(?LogDir,?Latest),
+    case file:read_file_info(LogFile) of
+	{error,_Reason}->
+	    ok;
+	{ok,FileInfo}->
+	    if
+		5*1000*1000<FileInfo#file_info.size->
+%		1*1000<FileInfo#file_info.size->
+		    F1=integer_to_list(erlang:system_time(millisecond)),
+		    F2=F1++".log",
+		    FileName=filename:join(?LogDir,F2),
+		    file:rename(LogFile,FileName),
+	      % max three log files;
+		    {ok,FileNames}=file:list_dir(?LogDir),
+		    Num=lists:foldl(fun(_X,Num)->Num+1 end, 0,FileNames),
+		    io:format("FileNames ~p~n",[{Num,FileNames}]),
+		    if 
+			3<Num->
+			    remove_oldest_log(FileNames); 
+			true->
+			    ok
+		    end;
+		true->
+		    ok
+	    end
+    end,
+    {ok,S}=file:open(LogFile,[append]),
+    io:format(S,"~w.~n",[Info]),
+    {ok,LogInfo}=file:consult(LogFile),
+   % io:format("LogInfo ~p~n",[LogInfo]),
+  %  AddedInfo=[Info|LogInfo],
+ %   lists:foreach(fun(X)->io:format(S,"~w.~n",[X]) end,AddedInfo),
+    file:close(S).
+
+remove_oldest_log(FileNames)->
+    [File1|T]=[filename:join(?LogDir,FileName)||FileName<-FileNames],
+    {ok,FileInfo}=file:read_file_info(File1),
+    FileToDelete=oldest(T,File1,FileInfo),
+    file:delete(FileToDelete).
+
+oldest([],OldestFile,_)->
+    OldestFile;
+oldest([File|T],OldestFile,OldestInfo)->
+    {ok,FileInfo}=file:read_file_info(File),
+    if 
+	FileInfo#file_info.mtime<OldestInfo#file_info.mtime->
+	    NewOldest=File,
+	    NewOldestInfo=FileInfo;
+	true ->
+	    NewOldest=OldestFile,
+	    NewOldestInfo=OldestInfo
+    end,
+    oldest(T,NewOldest,NewOldestInfo). 
+
+%% --------------------------------------------------------------------
+%% Function: 
+%% Description:
+%% Returns: non
+%% --------------------------------------------------------------------
+nice({Severity,{Y2,M,D},{H,Min,S},
+      Node,Application,Module,Fun,Line,Info})->
+    Y=Y2-2000,
+    {Y1,M1,D1}={integer_to_list(Y),integer_to_list(M),integer_to_list(D)},
+    {H1,Min1,S1}={integer_to_list(H),integer_to_list(Min),integer_to_list(S)}, 
+    DateTime=H1++":"++Min1++":"++S1++" "++D1++"/"++M1++"-"++Y1,
+    Severity1=atom_to_list(Severity),
+    Node1=atom_to_list(Node),
+    App1=atom_to_list(Application),
+    Module1=atom_to_list(Module),
+    Fun1=atom_to_list(Fun),
+    Line1=integer_to_list(Line),
+
+    _Msg=DateTime++" | "++Severity1++" | "++Node1++" | "++App1++"| "++Module1++"| "++Fun1++" | "++Line1++" | "++Info,
+ %   io:format("~p~n",[Msg]), 
+    io:format("~-16s ~-7s ~-25s ~-10s ~-15s ~-15s ~-4s ~s ~n",[DateTime,Severity1,Node1,App1,Module1,Fun1,Line1,Info]),
+    ok.
+ 

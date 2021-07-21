@@ -2,18 +2,9 @@
 %%% @author  : Joq Erlang
 %%% @doc: : 
 %%% Created : 
-%%% Pod is an erlang vm and 1-n erlang applications (containers) 
-%%% Pods network id is the node name  
-%%% The pod lives as long as the applications is living 
-%%% In each pod there is a mnesias dbase
-%%% Pod template {apiVersion, kind, metadata,[{namen,striang}]
-%%%               spec,[{containers,[{name,},{image,busybox},
-%%%                     {command,['erl cmd]},restart policy]
-%%% storage in Pod
-%%% File System:
 %%%  
 %%% -------------------------------------------------------------------
--module(monitor).   
+-module(monitor_server).   
 -behaviour(gen_server).
 
 %% --------------------------------------------------------------------
@@ -34,26 +25,6 @@
 %% Definitions 
 %% --------------------------------------------------------------------
 
-%% --------------------------------------------------------------------
-%% Function: available_hosts()
-%% Description: Based on hosts.config file checks which hosts are avaible
-%% Returns: List({HostId,Ip,SshPort,Uid,Pwd}
-%% --------------------------------------------------------------------
-
-
-
-
-
-% OaM related
--export([
-	 print/2
-       
-	]).
-
--export([start/0,
-	 stop/0,
-	 ping/0
-	]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3,handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -63,29 +34,6 @@
 %% External functions
 %% ====================================================================
 
-%% Asynchrounus Signals
-
-%% Gen server functions
-
-start()-> gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-stop()-> gen_server:call(?MODULE, {stop},infinity).
-
-
-%%---------------------------------------------------------------
-
-
-
-%%---------------------------------------------------------------
-
-    
-ping()-> 
-    gen_server:call(?MODULE, {ping},infinity).
-
-%%-----------------------------------------------------------------------
-print(Severity,Info)-> 
-    gen_server:cast(?MODULE, {print,Severity,Info}).
-
-%%----------------------------------------------------------------------
 
 
 %% ====================================================================
@@ -135,8 +83,10 @@ handle_call(Request, From, State) ->
 %%          {noreply, State, Timeout} |
 %%          {stop, Reason, State}            (terminate/2 is called)
 %% -------------------------------------------------------------------
+handle_cast({print,Info}, State) ->
+    nice(Info),
+    {noreply, State};
 
-    
 handle_cast({print,Severity,Info}, State) ->
     io:format("~p~n",[{Severity,Info}]),  
     {noreply, State};
@@ -192,3 +142,32 @@ code_change(_OldVsn, State, _Extra) ->
 %% Description:
 %% Returns: non
 %% --------------------------------------------------------------------
+%% Time       Date         Id   Severity      App     Module      Info
+%% 100721 05:33:45 12312312313 ticket kube_logger monitor badrpc nodedown  
+%%
+%% 10/07-21|123123434223|ticket|kube_logger    |longNAmF|badrpc nodedown   
+%% 10/07-21|123123166532|log   |servic1        |module1 |badrpc nodedown 
+%% 10/07-21|123123245764|alert |standrad_lib_al|log     |badrpc nodedown 
+%{alert,
+% {2021,7,20},
+%       {15,38,23},
+%       'test_mylog@joq62-X550CA',undefined,mylog_test,pass_0,100,"a1"}
+
+nice({Severity,{Y2,M,D},{H,Min,S},
+      Node,Application,Module,Fun,Line,Info})->
+    Y=Y2-2000,
+    {Y1,M1,D1}={integer_to_list(Y),integer_to_list(M),integer_to_list(D)},
+    {H1,Min1,S1}={integer_to_list(H),integer_to_list(Min),integer_to_list(S)}, 
+    DateTime=H1++":"++Min1++":"++S1++" "++D1++"/"++M1++"-"++Y1,
+    Severity1=atom_to_list(Severity),
+    Node1=atom_to_list(Node),
+    App1=atom_to_list(Application),
+    Module1=atom_to_list(Module),
+    Fun1=atom_to_list(Fun),
+    Line1=integer_to_list(Line),
+
+    Msg=DateTime++" | "++Severity1++" | "++Node1++" | "++App1++"| "++Module1++"| "++Fun1++" | "++Line1++" | "++Info,
+ %   io:format("~p~n",[Msg]), 
+    io:format("~-16s ~-7s ~-25s ~-10s ~-15s ~-15s ~-4s ~s ~n",[DateTime,Severity1,Node1,App1,Module1,Fun1,Line1,Info]),
+    ok.
+ 
